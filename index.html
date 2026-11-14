@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>商品价格监控工作台</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%88%3C/text%3E%3C/svg%3E">
+<script src="echarts.min.js"></script>
+<style>
+:root{
+  --bg:#f4f6fa; --card:#ffffff; --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb;
+  --brand:#4f46e5; --brand2:#6366f1; --good:#16a34a; --bad:#dc2626; --warn:#d97706;
+  --sidebar:#0f172a; --sidebar-ink:#cbd5e1;
+  --radius:14px; --shadow:0 1px 3px rgba(16,24,40,.08),0 1px 2px rgba(16,24,40,.04);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+.app{display:flex;min-height:100vh}
+
+/* ===== 侧边栏 ===== */
+.sidebar{width:212px;background:var(--sidebar);color:var(--sidebar-ink);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;flex-shrink:0}
+.logo{display:flex;align-items:center;gap:10px;padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+.logo .lg-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:19px}
+.logo .lg-txt{font-size:15px;font-weight:700;color:#fff;line-height:1.3}
+.logo .lg-sub{font-size:11px;color:#64748b;font-weight:400}
+.nav{flex:1;padding:12px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--sidebar-ink);font-size:13.5px;transition:background .15s,color .15s;user-select:none}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-item.active{background:linear-gradient(135deg,rgba(99,102,241,.9),rgba(139,92,246,.85));color:#fff;font-weight:600;box-shadow:0 4px 10px rgba(99,102,241,.35)}
+.nav-item .n-ico{font-size:16px;width:20px;text-align:center}
+.side-foot{padding:14px 18px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:#64748b;line-height:1.6}
+
+/* ===== 主区 ===== */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{background:var(--card);border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50}
+.topbar h1{font-size:18px;font-weight:700}
+.topbar .tb-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.tb-date{color:var(--muted);font-size:13px}
+.tb-upd{font-size:12px;color:var(--muted);background:#f3f4f6;padding:4px 10px;border-radius:20px}
+.tb-upd.fresh{color:#065f46;background:#ecfdf5}
+.content{padding:22px 26px 60px;max-width:1280px;width:100%}
+.view{display:none}
+.view.active{display:block;animation:fadeIn .18s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ===== 通用组件 ===== */
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;border:1px solid #f0f1f5}
+.card h3{font-size:14.5px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.card h3 .h-extra{margin-left:auto;font-size:12px;color:var(--muted);font-weight:400}
+.grid{display:grid;gap:14px}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g2{grid-template-columns:1fr 1fr}
+@media(max-width:1100px){.g4{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:7px 14px;border-radius:9px;cursor:pointer;font-size:13px;font-family:inherit;transition:all .15s}
+.btn:hover{border-color:#c7cdd8;background:#f8fafc}
+.btn-primary{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+.btn-primary:hover{background:#4338ca;border-color:#4338ca}
+.btn-danger{color:var(--bad);border-color:#fecaca}
+.btn-danger:hover{background:#fef2f2;border-color:#fca5a5}
+.btn-sm{padding:4px 10px;font-size:12px;border-radius:7px}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.badge-good{background:#ecfdf5;color:#065f46}
+.badge-warn{background:#fffbeb;color:#92400e}
+.badge-bad{background:#fef2f2;color:#991b1b}
+.badge-mut{background:#f3f4f6;color:#4b5563}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:13px;transition:all .15s}
+.chip:hover{border-color:#b6bcc8}
+.chip.on{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+.plat-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+.input,.select,textarea.input{width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:9px;font-size:13.5px;font-family:inherit;outline:none;background:#fff;transition:border .15s,box-shadow .15s}
+.input:focus,.select:focus,textarea.input:focus{border-color:var(--brand2);box-shadow:0 0 0 3px rgba(99,102,241,.12)}
+label.fl{display:block;font-size:12.5px;color:var(--muted);margin:0 0 5px 2px;font-weight:600}
+.form-row{margin-bottom:14px}
+.empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty .e-ico{font-size:44px;margin-bottom:12px}
+.empty .e-t{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:6px}
+.stat-card{display:flex;align-items:center;gap:14px}
+.stat-card .s-ico{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0}
+.stat-card .s-num{font-size:24px;font-weight:800;line-height:1.1}
+.stat-card .s-lab{font-size:12.5px;color:var(--muted);margin-top:2px}
+
+/* ===== 表格 ===== */
+.tbl-wrap{overflow-x:auto}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{background:#f8fafc;padding:9px 10px;text-align:left;font-weight:600;color:#475569;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0}
+.tbl td{padding:9px 10px;border-bottom:1px solid #f1f3f7;white-space:nowrap}
+.tbl tr:hover td{background:#f8fafc}
+.tbl .cell-low{background:#f0fdf4 !important;color:#15803d;font-weight:700}
+.tbl .cell-stale{color:#9ca3af}
+.plat-th{display:inline-flex;align-items:center;gap:5px}
+
+/* ===== 商品卡 ===== */
+.p-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.p-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid #f0f1f5;padding:16px;display:flex;flex-direction:column;gap:10px}
+.p-head{display:flex;gap:12px;align-items:center}
+.p-thumb{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;background-size:cover;background-position:center}
+.p-name{font-weight:700;font-size:14.5px;line-height:1.35}
+.p-cat{font-size:11.5px;color:var(--muted);margin-top:2px}
+.p-plats{display:flex;flex-wrap:wrap;gap:6px}
+.pp{display:inline-flex;align-items:center;gap:5px;font-size:12px;background:#f8fafc;border:1px solid #eef0f4;padding:3px 8px;border-radius:7px;cursor:pointer}
+.pp:hover{background:#f1f5f9}
+.pp b{font-weight:700}
+.p-foot{display:flex;align-items:center;gap:8px;margin-top:2px}
+.p-price{font-size:15px;font-weight:800;color:var(--brand)}
+.p-target{font-size:12px;color:var(--muted)}
+
+/* ===== 录入页 ===== */
+.entry-row{border:1px solid #eef0f4;border-radius:12px;padding:14px 16px;margin-bottom:12px;background:#fff}
+.entry-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.entry-plats{display:flex;flex-wrap:wrap;gap:10px}
+.ep-cell{min-width:150px;flex:1;max-width:210px}
+.ep-cell .ep-lab{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:600}
+.ep-cell .input{padding:6px 9px;font-size:13px}
+.entry-promo{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);margin-left:auto}
+.entry-promo input{accent-color:var(--brand)}
+
+/* ===== 走势/对比图 ===== */
+.chart-box{width:100%;height:420px}
+.chart-box-sm{width:100%;height:380px}
+.chips-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+@media(max-width:900px){.sum-grid{grid-template-columns:repeat(2,1fr)}}
+.sum-item{background:#f8fafc;border:1px solid #eef0f4;border-radius:11px;padding:12px 14px}
+.sum-item .si-lab{font-size:12px;color:var(--muted);margin-bottom:4px}
+.sum-item .si-val{font-size:18px;font-weight:800}
+.sum-item .si-sub{font-size:11.5px;color:var(--muted);margin-top:3px}
+
+/* ===== 建议页 ===== */
+.adv-card{display:flex;gap:18px;align-items:flex-start}
+.ring{width:74px;height:74px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+.ring-in{width:56px;height:56px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:19px;font-weight:800}
+.ring-in .r-cap{font-size:9px;color:var(--muted);font-weight:600;line-height:1}
+.adv-body{flex:1;min-width:0}
+.adv-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0}
+.adv-m{background:#f8fafc;border-radius:9px;padding:8px 11px;font-size:12px}
+.adv-m b{display:block;font-size:14.5px;margin-top:2px}
+.adv-reasons{list-style:none;font-size:12.5px;color:#374151}
+.adv-reasons li{padding:3px 0;display:flex;gap:6px;align-items:baseline}
+.adv-reasons li::before{content:"•";color:var(--brand2);font-weight:700}
+
+/* ===== 时间线 & 列表 ===== */
+.tl{list-style:none;position:relative;padding-left:20px}
+.tl::before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:#eef0f4;border-radius:2px}
+.tl li{position:relative;padding:7px 0 7px 8px;font-size:13px}
+.tl li::before{content:"";position:absolute;left:-19px;top:14px;width:10px;height:10px;border-radius:50%;background:#fff;border:2.5px solid var(--brand2)}
+.tl li .tl-date{color:var(--muted);font-size:11.5px;margin-right:8px}
+.mini-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.mini-card{background:#fff;border:1px solid #f0f1f5;border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+.mini-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.mini-head .m-name{font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini-price{font-size:15px;font-weight:800;color:var(--brand);margin-bottom:4px}
+.mini-delta{font-size:11.5px;margin-bottom:6px}
+.up{color:var(--bad)} .down{color:var(--good)}
+.drop-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed #f1f3f7;font-size:13px}
+.drop-row:last-child{border-bottom:none}
+.drop-row .d-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.drop-row .d-plat{font-size:12px;color:var(--muted)}
+.progress{height:8px;background:#eef0f4;border-radius:6px;overflow:hidden}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--brand2),#8b5cf6);border-radius:6px;transition:width .4s}
+
+/* ===== 弹窗/提示 ===== */
+.modal-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:60px 20px 40px;overflow-y:auto;backdrop-filter:blur(2px)}
+.modal{background:#fff;border-radius:16px;max-width:640px;width:100%;padding:24px 26px;box-shadow:0 20px 60px rgba(0,0,0,.25);animation:fadeIn .2s ease}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:16px}
+.modal .m-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+.modal-narrow{max-width:420px}
+.plat-checks{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media(max-width:640px){.plat-checks{grid-template-columns:repeat(2,1fr)}}
+.pc{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:9px;padding:7px 10px;cursor:pointer;font-size:12.5px;user-select:none}
+.pc input{accent-color:var(--brand)}
+.pc.checked{border-color:var(--brand2);background:#eef2ff}
+.links-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:640px){.links-grid{grid-template-columns:1fr}}
+.lk{display:flex;flex-direction:column;gap:4px}
+.lk span{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:5px}
+.lk .input{padding:6px 9px;font-size:12px}
+#toast-root{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:500;display:flex;flex-direction:column;gap:8px;align-items:center}
+.toast{background:#111827;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;transform:translateY(-8px);transition:all .25s;display:flex;gap:8px;align-items:center}
+.toast.show{opacity:1;transform:none}
+.toast.bad{background:#991b1b}
+.toast.warn{background:#92400e}
+.welcome-btns{display:flex;gap:12px;margin-top:18px}
+.welcome-btns .btn{flex:1;justify-content:center;padding:12px}
+.banner{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#eef2ff,#faf5ff);border:1px solid #e0e7ff;border-radius:12px;padding:13px 18px;margin-bottom:16px;flex-wrap:wrap}
+.banner .b-txt{flex:1;font-size:13px;min-width:200px}
+.banner .b-txt b{color:var(--brand)}
+.warn-box{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;font-size:12.5px;color:#92400e;margin-bottom:12px}
+.kbd-note{font-size:12px;color:var(--muted);background:#f8fafc;border:1px dashed var(--line);padding:10px 14px;border-radius:10px;line-height:1.7}
+@media(max-width:860px){
+  .sidebar{width:64px}
+  .sidebar .lg-txt,.sidebar .side-foot,.nav-item .n-txt{display:none}
+  .nav-item{justify-content:center}
+  .content{padding:16px 12px 50px}
+  .topbar{padding:12px 14px;flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="lg-icon">📈</div>
+      <div class="lg-txt">价格监控工作台<div class="lg-sub">Price Monitor Pro</div></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">数据存储于本机浏览器<br>可导出 JSON 备份/迁移</div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <h1 id="page-title">看板首页</h1>
+      <div class="tb-right">
+        <span class="tb-upd" id="tb-upd"></span>
+        <span class="tb-date" id="tb-date"></span>
+        <button class="btn btn-primary btn-sm" onclick="App.go('entry')">✏️ 录今日价</button>
+      </div>
+    </header>
+    <div class="content">
+      <section class="view" id="view-dashboard"></section>
+      <section class="view" id="view-products"></section>
+      <section class="view" id="view-entry"></section>
+      <section class="view" id="view-trends"></section>
+      <section class="view" id="view-compare"></section>
+      <section class="view" id="view-advice"></section>
+      <section class="view" id="view-data"></section>
+    </div>
+  </main>
+</div>
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script>
+"use strict";
+/* ==================================================================
+   商品价格监控工作台 — 单文件本地版
+   数据层收口在 Store：后续迁移云端（CloudBase 等）只需替换该模块
+================================================================== */
+
+/* ---------- 平台定义 ---------- */
+const PLATFORMS = [
+  {key:'taobao',     name:'淘宝',    type:'new',  color:'#FF5000'},
+  {key:'jd',         name:'京东',    type:'new',  color:'#E1251B'},
+  {key:'pdd',        name:'拼多多',  type:'new',  color:'#E02E24'},
+  {key:'douyin',     name:'抖音商城', type:'new',  color:'#2563EB'},
+  {key:'apple_new',    name:'Apple官网', type:'new',  color:'#1D1D1F'},
+  {key:'apple_refurb', name:'Apple官翻', type:'new',  color:'#0071E3'},
+  {key:'xianyu',     name:'闲鱼',    type:'used', color:'#D9A400'},
+  {key:'zhuanzhuan', name:'转转',    type:'used', color:'#F59E0B'},
+  {key:'aihuishou',  name:'爱回收',  type:'used', color:'#059669'},
+  {key:'paipai',     name:'拍拍严选', type:'used', color:'#3B82F6'},
+];
+const P_MAP = Object.fromEntries(PLATFORMS.map(p=>[p.key,p]));
+const NEW_PLATS = PLATFORMS.filter(p=>p.type==='new');
+const USED_PLATS = PLATFORMS.filter(p=>p.type==='used');
+const CONDITIONS = ['99新','95新','9成新','8成新','7成新及以下'];
+const CATEGORIES = ['手机数码','电脑办公','家用电器','智能穿戴','游戏娱乐','影音耳机','美妆个护','其他'];
+
+const SEARCH_URLS = {
+  taobao:n=>'https://s.taobao.com/search?q='+encodeURIComponent(n),
+  jd:n=>'https://search.jd.com/Search?keyword='+encodeURIComponent(n),
+  pdd:n=>'https://mobile.yangkeduo.com/search_result.html?search_key='+encodeURIComponent(n),
+  douyin:n=>'https://www.douyin.com/search/'+encodeURIComponent(n),
+  apple_new:()=> 'https://www.apple.com.cn/shop/buy-mac/macbook-pro',
+  apple_refurb:()=> 'https://www.apple.com.cn/shop/refurbished/mac/macbook-pro',
+  xianyu:n=>'https://www.goofish.com/search?q='+encodeURIComponent(n),
+  zhuanzhuan:n=>'https://www.zhuanzhuan.com/search/?keyword='+encodeURIComponent(n),
+  aihuishou:n=>'https://www.aihuishou.com/search?keyword='+encodeURIComponent(n),
+  paipai:n=>'https://search.jd.com/Search?keyword='+encodeURIComponent(n)+'%20拍拍',
+};
+const LINK_PATTERNS = [
+  ['apple_refurb', /apple\.com(?:\.cn)?\/.*refurbished/],
+  ['apple_new',    /apple\.com(?:\.cn)?/],
+  ['xianyu',     /goofish\.com|2\.taobao\.com|xianyu/],
+  ['douyin',     /jinritemai\.com|buyin\.|douyin\.com/],
+  ['pdd',        /yangkeduo\.com|pinduoduo\.com|pdd\.com/],
+  ['zhuanzhuan', /zhuanzhuan\.com/],
+  ['aihuishou',  /aihuishou\.com|resell/],
+  ['paipai',     /paipai\.com/],
+  ['jd',         /item\.jd\.com|jd\.com|3\.cn/],
+  ['taobao',     /taobao\.com|tmall\.com|tb\.cn|t\.mall/],
+];
+const VIEW_DEFS = [
+  {key:'dashboard', ico:'📊', name:'看板首页', title:'📊 看板首页'},
+  {key:'products',  ico:'📦', name:'商品管理', title:'📦 商品管理'},
+  {key:'entry',     ico:'✏️', name:'价格录入', title:'✏️ 价格录入'},
+  {key:'trends',    ico:'📉', name:'趋势分析', title:'📉 价格趋势'},
+  {key:'compare',   ico:'⚖️', name:'平台对比', title:'⚖️ 多平台对比'},
+  {key:'advice',    ico:'💡', name:'购买建议', title:'💡 购买建议'},
+  {key:'data',      ico:'⚙️', name:'数据管理', title:'⚙️ 数据管理'},
+];
+
+/* ---------- 工具 ---------- */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = n => { const v=Number(n); return '¥'+(Number.isInteger(v)?v.toLocaleString('zh-CN'):v.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})); };
+const fmtD = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today = () => fmtD(new Date());
+const parseD = s => { const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); };
+const shortD = s => (s||'').slice(5);
+const genId = p => (p||'r')+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const platColor = k => (P_MAP[k]||{}).color || '#94a3b8';
+const platName = k => (P_MAP[k]||{}).name || k;
+const WEEK = ['周日','周一','周二','周三','周四','周五','周六'];
+function dateCN(s){ const d=parseD(s); return d.getMonth()+1+'月'+d.getDate()+'日 '+WEEK[d.getDay()]; }
+
+/* ---------- 存储层（云端迁移时替换此处） ---------- */
+const Store = {
+  KEY:'price-monitor-workbench-v1',
+  data:{products:[],prices:[],meta:{welcomed:false}},
+  load(){
+    try{
+      const raw = localStorage.getItem(this.KEY);
+      if(raw){ const d=JSON.parse(raw); if(d && Array.isArray(d.products)){ this.data = normalize(d); return; } }
+    }catch(e){ console.warn('本地数据读取失败', e); }
+    this.data = {products:[],prices:[],meta:{welcomed:false}};
+  },
+  save(){ _idx=null; try{ localStorage.setItem(this.KEY, JSON.stringify(this.data)); }catch(e){ toast('保存失败：浏览器本地存储空间不足','bad'); } },
+  replace(d){ this.data = normalize(d); this.save(); },
+};
+function normalize(d){
+  d.products = d.products||[]; d.prices = d.prices||[]; d.meta = d.meta||{};
+  d.products.forEach(p=>{ p.platforms=p.platforms||[]; p.links=p.links||{}; p.id=p.id||genId('p'); });
+  d.prices = d.prices.filter(r=>r && r.pid && r.platform && +r.price>0 && r.date);
+  return d;
+}
+const DB = () => Store.data;
+
+/* ---------- 索引与查询 ---------- */
+let _idx=null;
+function IDX(){
+  if(_idx) return _idx;
+  const m=new Map();
+  for(const r of DB().prices){
+    let a=m.get(r.pid); if(!a){a=new Map(); m.set(r.pid,a);}
+    let arr=a.get(r.platform); if(!arr){arr=[]; a.set(r.platform,arr);}
+    arr.push(r);
+  }
+  for(const a of m.values()) for(const arr of a.values()) arr.sort((x,y)=> x.date<y.date?-1:(x.date>y.date?1:0));
+  _idx=m; return m;
+}
+function platType(k){ return (P_MAP[k]||{}).type || 'new'; }
+function latest(pid,plat,cap){
+  const arr=(IDX().get(pid)||new Map()).get(plat)||[];
+  let last=null;
+  for(const r of arr){ if(cap && r.date>cap) continue; last=r; }
+  return last;
+}
+function latestAll(pid,cap){
+  const p=DB().products.find(x=>x.id===pid); if(!p) return {};
+  const out={};
+  for(const k of p.platforms){ const r=latest(pid,k,cap); if(r) out[k]=r; }
+  return out;
+}
+function lowestNewNow(pid,cap){
+  let best=null;
+  for(const pl of NEW_PLATS){ const r=latest(pid,pl.key,cap); if(r && (!best || r.price<best.price)) best=r; }
+  return best;
+}
+function lowestUsedNow(pid,cap){
+  let best=null;
+  for(const pl of USED_PLATS){ const r=latest(pid,pl.key,cap); if(r && (!best || r.price<best.price)) best=r; }
+  return best;
+}
+function dailyLowSeries(pid,type,cap){
+  const map={};
+  for(const pl of PLATFORMS){
+    if(pl.type!==type) continue;
+    const arr=(IDX().get(pid)||new Map()).get(pl.key)||[];
+    for(const r of arr){ if(cap && r.date>cap) continue; if(map[r.date]===undefined || r.price<map[r.date]) map[r.date]=r.price; }
+  }
+  return Object.entries(map).map(([date,price])=>({date,price:+price})).sort((a,b)=>a.date<b.date?-1:1);
+}
+function lowestEver(pid,cap){ const s=dailyLowSeries(pid,'new',cap); return s.length? s.reduce((a,b)=>b.price<a.price?b:a) : null; }
+function percentileOf(pid,price,cap){
+  const s=dailyLowSeries(pid,'new',cap).map(x=>x.price);
+  if(!s.length) return 50;
+  return Math.round(s.filter(v=>v<price).length/s.length*100);
+}
+function lastUpdateAll(){
+  let max=null;
+  for(const r of DB().prices) if(!max || r.date>max) max=r.date;
+  return max;
+}
+function productLastDate(pid){
+  let max=null;
+  const a=IDX().get(pid); if(!a) return null;
+  for(const arr of a.values()) for(const r of arr) if(!max||r.date>max) max=r.date;
+  return max;
+}
+function todayDrops(){
+  const t=today(); const res=[];
+  for(const p of DB().products){
+    for(const k of p.platforms){
+      const cur=latest(p.id,k,t); if(!cur || cur.date!==t) continue;
+      let prev=null;
+      const arr=(IDX().get(p.id)||new Map()).get(k)||[];
+      for(const r of arr){ if(r.date>=t) continue; prev=r; }
+      if(prev && cur.price<prev.price) res.push({p,plat:k,cur,prev});
+    }
+  }
+  return res.sort((a,b)=>(a.cur.price-a.prev.price)-(b.cur.price-b.prev.price));
+}
+function dropEvents(limit){
+  const evts=[];
+  for(const p of DB().products){
+    const a=IDX().get(p.id); if(!a) continue;
+    for(const [plat,arr] of a.entries()){
+      let prev=null;
+      for(const r of arr){
+        if(prev && r.price<prev.price) evts.push({date:r.date,p,plat,from:prev.price,to:r.price});
+        prev=r;
+      }
+    }
+  }
+  return evts.sort((a,b)=>a.date<b.date?1:-1).slice(0,limit||12);
+}
+function detectPlatform(url){
+  const s=String(url||'').toLowerCase();
+  for(const [k,re] of LINK_PATTERNS) if(re.test(s)) return k;
+  return null;
+}
+function openPlatURL(plat,name,link){
+  const url = link || (SEARCH_URLS[plat] ? SEARCH_URLS[plat](name) : null);
+  if(url) window.open(url,'_blank'); else toast('未配置该平台链接','warn');
+}
+
+/* ---------- SVG 迷你走势 ---------- */
+function spark(vals,w,h,color){
+  w=w||130; h=h||38; color=color||'#4f46e5';
+  if(!vals || vals.length<2) return '<div class="muted" style="height:'+h+'px;font-size:11px">暂无数据</div>';
+  const min=Math.min(...vals),max=Math.max(...vals),rng=(max-min)||1;
+  const pts=vals.map((v,i)=>((i/(vals.length-1))*w).toFixed(1)+','+(h-3-((v-min)/rng)*(h-7)).toFixed(1)).join(' ');
+  const last=vals[vals.length-1];
+  return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'">'+
+    '<polyline points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
+    '<circle cx="'+((w).toFixed(1))+'" cy="'+(h-3-((last-min)/rng)*(h-7)).toFixed(1)+'" r="3" fill="'+color+'"/></svg>';
+}
+
+/* ---------- Toast / 弹窗 ---------- */
+function toast(msg,type){
+  type=type||'ok';
+  const t=document.createElement('div'); t.className='toast '+type; t.textContent=msg;
+  document.getElementById('toast-root').appendChild(t);
+  setTimeout(()=>t.classList.add('show'),10);
+  setTimeout(()=>{t.classList.remove('show'); setTimeout(()=>t.remove(),300);},2600);
+}
+function openModal(html,narrow){
+  document.getElementById('modal-root').innerHTML =
+    '<div class="modal-mask" onclick="if(event.target===this)App.closeModal()"><div class="modal '+(narrow?'modal-narrow':'')+'">'+html+'</div></div>';
+}
+function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
+let _confirmFn=null;
+function confirmBox(title,msg,okText,fn,danger){
+  _confirmFn=fn;
+  openModal('<h3>'+esc(title)+'</h3><div style="font-size:13.5px;line-height:1.8;color:#374151">'+msg+'</div>'+
+    '<div class="m-foot"><button class="btn" onclick="App.closeModal()">取消</button>'+
+    '<button class="btn '+(danger?'btn-danger':'btn-primary')+'" onclick="App.confirmOk()">'+esc(okText||'确认')+'</button></div>', true);
+}
+
+/* ---------- 图表管理 ---------- */
+const charts={};
+const hasEcharts = typeof echarts !== 'undefined';
+function killCharts(){ Object.keys(charts).forEach(k=>{ if(charts[k]){charts[k].dispose(); delete charts[k];} }); }
+window.addEventListener('resize',()=>Object.values(charts).forEach(c=>c&&c.resize()));
+function mkChart(elId){
+  if(!hasEcharts) return null;
+  const el=document.getElementById(elId); if(!el) return null;
+  const c=echarts.init(el); charts[elId]=c; return c;
+}
+
+/* ==================================================================
+   模拟数据生成器
+================================================================== */
+function genDemoData(){
+  const defs=[
+    {name:'iPhone 15 Pro 256G',              cat:'手机数码', base:6999, target:5800, emoji:'📱'},
+    {name:'MacBook Air M3 13英寸 16+512',    cat:'电脑办公', base:8999, target:7600, emoji:'💻'},
+    {name:'索尼 WH-1000XM5 降噪耳机',        cat:'影音耳机', base:2299, target:1750, emoji:'🎧'},
+    {name:'Nintendo Switch OLED 白色',       cat:'游戏娱乐', base:2299, target:1900, emoji:'🎮'},
+    {name:'AirPods Pro 2 (USB-C)',           cat:'影音耳机', base:1699, target:1350, emoji:'🎵'},
+    {name:'小米14 Ultra 16+512',             cat:'手机数码', base:5999, target:4800, emoji:'📲'},
+    {name:'戴森 V12 Detect Slim 吸尘器',     cat:'家用电器', base:3499, target:2700, emoji:'🧹'},
+    {name:'Apple Watch Series 9 45mm',       cat:'智能穿戴', base:3199, target:2500, emoji:'⌚'},
+  ];
+  const newF={taobao:1.015,jd:1.0,pdd:0.965,douyin:1.03};
+  const usedF={xianyu:0.72,zhuanzhuan:0.76,aihuishou:0.80,paipai:0.78};
+  const products=[],prices=[];
+  const t0=today(); const end=parseD(t0);
+  defs.forEach((d,i)=>{
+    const p={id:'d'+(i+1),name:d.name,category:d.cat,icon:d.emoji,img:'',targetPrice:d.target,note:'演示商品：价格数据为模拟生成，仅供看板功能演示',
+      platforms:PLATFORMS.map(x=>x.key),links:{},createdAt:t0};
+    products.push(p);
+  });
+  let rw=0;
+  for(let i=0;i<8;i++){
+    const p=products[i]; const d=defs[i]; rw=0;
+    for(let k=0;k<365;k++){
+      const dt=new Date(end); dt.setDate(end.getDate()-364+k);
+      const ds=fmtD(dt);
+      const prog=k/364;
+      // 大促因子
+      let promo=1; const m=dt.getMonth()+1,day=dt.getDate(),md=m*100+day;
+      if(m===6 && day<=20) promo=1-0.10*Math.max(0,(day-10)/8)-(day>=16&&day<=18?0.04:0);
+      else if(md>=1020 && md<=1111) promo=1-0.11*Math.max(0,(day-27)/13)-(day>=10&&day<=11?0.03:0);
+      else if(md===1212) promo=0.93;
+      else if(m===1 && day>=8 && day<=20) promo=0.96;
+      // 随机游走
+      rw=clamp(rw+(Math.random()-0.5)*0.018,-0.045,0.045);
+      const dayNew=d.base*(1-0.12*prog)*(1+rw)*promo*(1+(Math.random()-0.5)*0.01);
+      // 新平台（约 55% 天数有报价）
+      for(const pk in newF){
+        const isToday=(ds===t0);
+        if(!isToday && Math.random()>0.55) continue;
+        prices.push({id:genId(),pid:p.id,platform:pk,date:ds,
+          price:Math.round(dayNew*newF[pk]*(1+(Math.random()-0.5)*0.012)),promo:promo<0.98});
+      }
+      // 二手平台（约 22% 天数有报价）
+      for(const pk in usedF){
+        const isToday=(ds===t0);
+        if(!isToday && Math.random()>0.22) continue;
+        prices.push({id:genId(),pid:p.id,platform:pk,date:ds,
+          price:Math.round(dayNew*usedF[pk]*(1+(Math.random()-0.5)*0.03)),
+          condition:CONDITIONS[Math.floor(Math.random()*3)]});
+      }
+    }
+  }
+  return normalize({products,prices,meta:{welcomed:true,demo:true}});
+}
+
+/* ==================================================================
+   视图渲染
+================================================================== */
+const CUR={view:'dashboard',trendPid:null,trendRange:90,cmpPid:null,entryDate:null};
+
+function renderNav(){
+  document.getElementById('nav').innerHTML = VIEW_DEFS.map(v=>
+    '<div class="nav-item'+(CUR.view===v.key?' active':'')+'" onclick="App.go(\''+v.key+'\')">'+
+    '<span class="n-ico">'+v.ico+'</span><span class="n-txt">'+v.name+'</span></div>').join('');
+}
+function renderTopbar(){
+  const v=VIEW_DEFS.find(x=>x.key===CUR.view)||VIEW_DEFS[0];
+  document.getElementById('page-title').textContent=v.title;
+  const t=today(); const lu=lastUpdateAll();
+  const el=document.getElementById('tb-upd');
+  if(lu){
+    const days=(parseD(t)-parseD(lu))/86400000;
+    el.textContent='最后更新：'+shortD(lu)+(days<=1?' ✅':days<=3?' · '+days+'天前':' · 已过期'+days+'天');
+    el.className='tb-upd'+(days<=1?' fresh':'');
+  }else{ el.textContent='暂无数据'; el.className='tb-upd'; }
+  document.getElementById('tb-date').textContent=dateCN(t);
+}
+function switchView(v){
+  CUR.view=v;
+  document.querySelectorAll('.view').forEach(s=>s.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  killCharts(); renderNav(); renderTopbar();
+  ({dashboard:renderDashboard,products:renderProducts,entry:renderEntry,trends:renderTrends,
+    compare:renderCompare,advice:renderAdvice,data:renderData})[v]();
+}
+
+/* ---------- 看板首页 ---------- */
+function renderDashboard(){
+  const db=DB(); const t=today();
+  const el=document.getElementById('view-dashboard');
+  if(!db.products.length){
+    el.innerHTML='<div class="card"><div class="empty"><div class="e-ico">📊</div><div class="e-t">工作台还是空的</div>'+
+      '<div>添加你的第一件商品，或先生成演示数据体验全部功能</div>'+
+      '<div style="margin-top:16px;display:flex;gap:10px;justify-content:center">'+
+      '<button class="btn btn-primary" onclick="App.genDemo()">🎲 生成演示数据</button>'+
+      '<button class="btn" onclick="App.go(\'products\');setTimeout(()=>App.openProductForm(),80)">＋ 添加商品</button></div></div></div>';
+    return;
+  }
+  const drops=todayDrops();
+  const reached=db.products.filter(p=>{const c=lowestNewNow(p.id); return c&&p.targetPrice&&c.price<=p.targetPrice;}).length;
+  const lu=lastUpdateAll();
+  const todayCnt=db.products.filter(p=>productLastDate(p.id)===t).length;
+  const stale=db.products.filter(p=>{const d=productLastDate(p.id); return d && (parseD(t)-parseD(d))/86400000>3;});
+  const events=dropEvents(10);
+  // 每商品30天迷你走势
+  const minis=db.products.map(p=>{
+    const s=dailyLowSeries(p.id,'new').slice(-30);
+    const vals=s.map(x=>x.price);
+    const cur=lowestNewNow(p.id);
+    const old=s.length>1?s[0].price:null;
+    let delta=null;
+    if(cur&&old) delta=(cur.price-old)/old*100;
+    return {p,vals,cur,delta,lastD:productLastDate(p.id)};
+  });
+  el.innerHTML=
+  '<div class="banner"><span style="font-size:20px">✏️</span><div class="b-txt">今日录入进度：<b>'+todayCnt+' / '+db.products.length+'</b> 件商品已有今日价格'+
+    (todayCnt<db.products.length?' —— 花一分钟把今天各平台的价格记进来，看板才能反映最新行情':'，今日数据已齐全 👍')+
+    '</div><button class="btn btn-primary btn-sm" onclick="App.go(\'entry\')">去录入</button></div>'+
+  '<div class="grid g4" style="margin-bottom:16px">'+
+    statCard(0,db.products.length,'监控商品数')+
+    statCard(1,drops.length,'今日降价')+
+    statCard(2,reached,'已达目标价')+
+    statCard(3,stale.length,'数据过期(>3天)')+
+  '</div>'+
+  '<div class="grid g2">'+
+    '<div class="card"><h3>📉 今日降价 TOP'+Math.min(8,drops.length||1)+'<span class="h-extra">与该平台上次记录价对比</span></h3>'+
+      (drops.length?drops.slice(0,8).map(d=>
+        '<div class="drop-row"><span class="plat-dot" style="background:'+platColor(d.plat)+'"></span>'+
+        '<span class="d-name">'+esc(d.p.name)+'</span><span class="d-plat">'+platName(d.plat)+'</span>'+
+        '<span class="num down" style="font-weight:700">'+money(d.cur.price)+' <small style="font-weight:400">('+money(d.prev.price)+'↓)</small></span>'+
+        '<span class="badge badge-good">-'+Math.round((d.prev.price-d.cur.price)/d.prev.price*1000)/10+'%</span></div>').join('')
+      :'<div class="muted" style="padding:14px 0;text-align:center">今日暂无降价记录</div>')+
+    '</div>'+
+    '<div class="card"><h3>🕒 最近价格动态</h3>'+
+      (events.length?'<ul class="tl">'+events.map(e=>
+        '<li><span class="tl-date">'+shortD(e.date)+'</span>'+esc(e.p.name)+' <span class="plat-dot" style="background:'+platColor(e.plat)+';margin:0 4px 0 2px"></span>'+platName(e.plat)+
+        ' 降价 <b class="down num">'+money(e.from)+' → '+money(e.to)+'</b></li>').join('')+'</ul>'
+      :'<div class="muted" style="padding:14px 0;text-align:center">暂无降价动态</div>')+
+    '</div>'+
+  '</div>'+
+  '<div class="card" style="margin-top:14px"><h3>🧭 全部商品行情速览<span class="h-extra">近30天 · 全网新低</span></h3><div class="mini-grid">'+
+    minis.map(m=>{
+      const staleCls=m.lastD&&(parseD(t)-parseD(m.lastD))/86400000>3;
+      return '<div class="mini-card" style="cursor:pointer" onclick="App.go(\'trends\');App.setTrendProduct(\''+m.p.id+'\')">'+
+      '<div class="mini-head"><span style="font-size:18px">'+(m.p.icon||'📦')+'</span><span class="m-name">'+esc(m.p.name)+'</span></div>'+
+      '<div class="mini-price num">'+(m.cur?money(m.cur.price):'—')+' <small class="muted" style="font-weight:400;font-size:11px">'+(m.cur?platName(m.cur.platform):'')+'</small></div>'+
+      '<div class="mini-delta">'+(m.delta===null?'<span class="muted">—</span>':(m.delta>0?'<span class="up">▲30天 +'+m.delta.toFixed(1)+'%</span>':m.delta<0?'<span class="down">▼30天 '+m.delta.toFixed(1)+'%</span>':'<span class="muted">— 持平</span>'))+
+      (staleCls?' <span class="badge badge-bad" style="margin-left:4px">数据过期</span>':'')+'</div>'+
+      spark(m.vals)+'</div>';
+    }).join('')+
+  '</div></div>';
+}
+function statCard(i,num,label){
+  const conf=[{bg:'#eef2ff',t:'📦'},{bg:'#ecfdf5',t:'📉'},{bg:'#fffbeb',t:'🎯'},{bg:'#fef2f2',t:'⏰'}][i];
+  return '<div class="card stat-card"><div class="s-ico" style="background:'+conf.bg+'">'+conf.t+'</div>'+
+    '<div><div class="s-num num">'+num+'</div><div class="s-lab">'+label+'</div></div></div>';
+}
+
+/* ---------- 商品管理 ---------- */
+function renderProducts(){
+  const db=DB(); const el=document.getElementById('view-products');
+  if(!db.products.length){
+    el.innerHTML='<div class="card"><div class="empty"><div class="e-ico">📦</div><div class="e-t">还没有监控商品</div>'+
+      '<div>添加想监控价格的商品，粘贴商品链接可自动识别平台</div>'+
+      '<div style="margin-top:16px;display:flex;gap:10px;justify-content:center">'+
+      '<button class="btn btn-primary" onclick="App.openProductForm()">＋ 添加商品</button>'+
+      '<button class="btn" onclick="App.genDemo()">🎲 生成演示数据</button></div></div></div>';
+    return;
+  }
+  el.innerHTML=
+  '<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">'+
+    '<button class="btn btn-primary" onclick="App.openProductForm()">＋ 添加商品</button>'+
+    '<span class="muted" style="align-self:center;font-size:12.5px">共 '+db.products.length+' 件商品 · 点击卡片上的平台标签可直达链接</span></div>'+
+  '<div class="p-grid">'+db.products.map(p=>{
+    const cur=lowestNewNow(p.id); const used=lowestUsedNow(p.id);
+    const lu=productLastDate(p.id); const t=today();
+    const stale=lu&&(parseD(t)-parseD(lu))/86400000>3;
+    const thumbStyle=p.img?('background-image:url(\''+esc(p.img)+'\')'):('background:'+tileBg(p.name)+'');
+    return '<div class="p-card">'+
+      '<div class="p-head"><div class="p-thumb" style="'+thumbStyle+'">'+(p.img?'':esc(p.icon||'📦'))+'</div>'+
+      '<div style="flex:1;min-width:0"><div class="p-name">'+esc(p.name)+'</div>'+
+      '<div class="p-cat">'+esc(p.category||'未分类')+(stale?' · <span style="color:#dc2626">数据过期 '+shortD(lu)+'</span>':' · 更新 '+shortD(lu||'—'))+'</div></div>'+
+      '<div style="display:flex;gap:6px"><button class="btn btn-sm" onclick="App.openProductForm(\''+p.id+'\')">编辑</button>'+
+      '<button class="btn btn-sm btn-danger" onclick="App.deleteProduct(\''+p.id+'\')">删除</button></div></div>'+
+      '<div class="p-plats">'+p.platforms.map(k=>{
+        const r=latest(p.id,k);
+        return '<span class="pp" title="'+(r?'更新于 '+r.date+(r.condition?' · '+r.condition:''):'暂无记录')+'" onclick="App.openLink(\''+k+'\',\''+p.id+'\')">'+
+          '<span class="plat-dot" style="background:'+platColor(k)+'"></span>'+platName(k)+(r?' <b class="num">'+money(r.price)+'</b>':'')+'</span>';
+      }).join('')+'</div>'+
+      '<div class="p-foot"><span class="p-price num">'+(cur?money(cur.price):'—')+'</span>'+
+      (used?'<span class="muted num" style="font-size:12px">二手低至 '+money(used.price)+'</span>':'')+
+      (p.targetPrice?'<span class="p-target" style="margin-left:auto">目标 '+money(p.targetPrice)+'</span>':'')+'</div>'+
+      (p.note?'<div class="muted" style="font-size:12px;line-height:1.5">'+esc(p.note)+'</div>':'')+
+    '</div>';
+  }).join('')+'</div>';
+}
+function tileBg(name){
+  const colors=['#eef2ff','#ecfdf5','#fff7ed','#fef2f2','#f0f9ff','#faf5ff','#fefce8','#f1f5f9'];
+  let h=0; for(const c of (name||'x')) h=(h*31+c.charCodeAt(0))>>>0;
+  return colors[h%colors.length];
+}
+
+/* ---------- 价格录入 ---------- */
+function renderEntry(){
+  const db=DB(); const el=document.getElementById('view-entry');
+  if(!db.products.length){
+    el.innerHTML='<div class="card"><div class="empty"><div class="e-ico">✏️</div><div class="e-t">先添加商品才能录价</div>'+
+      '<button class="btn btn-primary" style="margin-top:14px" onclick="App.go(\'products\')">去添加商品</button></div></div>';
+    return;
+  }
+  const t=CUR.entryDate||today();
+  el.innerHTML=
+  '<div class="banner"><span style="font-size:20px">🗓️</span><div class="b-txt">选择日期（默认今天，可选过去日期补录），填入各平台当前价格后保存。'+
+  '已填过的日期重复保存会<b>覆盖旧价</b>。留空的平台不会记录。</div></div>'+
+  '<div class="card" style="margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">'+
+    '<div><label class="fl">录入日期</label><input type="date" class="input" id="entry-date" value="'+t+'" style="width:170px" onchange="App.onEntryDate()"></div>'+
+    '<button class="btn btn-primary" style="align-self:flex-end" onclick="App.saveEntryAll()">💾 保存所有已填</button>'+
+    '<div class="kbd-note" style="flex:1;min-width:220px">💡 小技巧：点「复制上次」可快速把上次价格填入全部平台，再只改有变动的，几秒钟完成一天记录。</div>'+
+  '</div>'+
+  db.products.map(p=>{
+    const cap=document.getElementById('entry-date')?document.getElementById('entry-date').value:t;
+    const lastAll=latestAll(p.id,cap);
+    if(!p.platforms.length) return '';
+    return '<div class="entry-row"><div class="entry-head">'+
+      '<span style="font-size:20px">'+(p.icon||'📦')+'</span><b>'+esc(p.name)+'</b>'+
+      '<button class="btn btn-sm" onclick="App.copyLastRow(\''+p.id+'\')">⧉ 复制上次</button>'+
+      '<label class="entry-promo"><input type="checkbox" id="epromo_'+p.id+'">今日为促销价（如 618/双11）</label></div>'+
+      '<div class="entry-plats">'+p.platforms.map(k=>{
+        const pl=P_MAP[k]; const last=lastAll[k];
+        const condSel = pl.type==='used'
+          ? '<select class="input" id="ec_'+p.id+'_'+k+'" style="margin-top:5px;font-size:12px;padding:4px 7px">'+
+            CONDITIONS.map(c=>'<option'+(last&&last.condition===c?' selected':'')+'>'+c+'</option>').join('')+'</select>'
+          : '';
+        return '<div class="ep-cell"><div class="ep-lab"><span class="plat-dot" style="background:'+pl.color+'"></span>'+pl.name+
+          (last?' <span style="font-weight:400">上次 '+money(last.price)+' · '+shortD(last.date)+'</span>':'')+'</div>'+
+          '<input type="number" step="0.01" min="0" class="input" id="ep_'+p.id+'_'+k+'" placeholder="'+(last?last.price:'填价格')+'">'+condSel+'</div>';
+      }).join('')+'</div>'+
+      '<div style="margin-top:12px"><button class="btn btn-sm btn-primary" onclick="App.saveEntryRow(\''+p.id+'\')">保存该商品</button></div>'+
+    '</div>';
+  }).join('');
+}
+function collectEntryRow(pid,date){
+  const p=DB().products.find(x=>x.id===pid); if(!p) return null;
+  const promo=document.getElementById('epromo_'+pid)?.checked||false;
+  const recs=[];
+  for(const k of p.platforms){
+    const inp=document.getElementById('ep_'+pid+'_'+k);
+    if(!inp || inp.value==='' || +inp.value<=0) continue;
+    const r={id:genId(),pid,platform:k,date,price:Math.round(+inp.value*100)/100,promo};
+    const cond=document.getElementById('ec_'+pid+'_'+k);
+    if(cond && cond.value) r.condition=cond.value;
+    recs.push(r);
+  }
+  return recs;
+}
+function saveEntries(pids){
+  const date=(document.getElementById('entry-date')||{}).value||today();
+  if(!date){ toast('请选择日期','warn'); return; }
+  let n=0;
+  for(const pid of pids){
+    const recs=collectEntryRow(pid,date); if(!recs) continue;
+    for(const r of recs){
+      const db=DB();
+      const i=db.prices.findIndex(x=>x.pid===r.pid&&x.platform===r.platform&&x.date===r.date);
+      if(i>=0) db.prices[i]=r; else db.prices.push(r);
+      n++;
+    }
+  }
+  if(!n){ toast('没有填入任何价格','warn'); return; }
+  Store.save(); toast('已保存 '+n+' 条价格记录 ✅');
+  const keep=CUR.view; switchView(keep==='entry'?'entry':keep);
+}
+
+/* ---------- 趋势分析 ---------- */
+function renderTrends(){
+  const db=DB(); const el=document.getElementById('view-trends');
+  if(!db.products.length){ el.innerHTML=emptyCard('📉','还没有商品数据'); return; }
+  if(!CUR.trendPid || !db.products.find(p=>p.id===CUR.trendPid)) CUR.trendPid=db.products[0].id;
+  const p=db.products.find(x=>x.id===CUR.trendPid);
+  el.innerHTML=
+  '<div class="chips-row">'+db.products.map(x=>'<span class="chip'+(x.id===CUR.trendPid?' on':'')+'" onclick="App.setTrendProduct(\''+x.id+'\')">'+esc(x.name)+'</span>').join('')+'</div>'+
+  '<div class="chips-row">'+[30,90,365,0].map(r=>'<span class="chip'+(CUR.trendRange===r?' on':'')+'" onclick="App.setTrendRange('+r+')">'+(r===0?'全部':r+'天')+'</span>').join('')+'</div>'+
+  trendSummaryHTML(p)+
+  '<div class="card"><h3>📈 '+esc(p.name)+' · 各平台价格走势</h3>'+
+  (hasEcharts?'<div id="trend-chart" class="chart-box"></div>':'<div class="warn-box">未找到 echarts.min.js，图表无法渲染。请确保它与 index.html 在同一目录。</div>')+
+  '</div>';
+  if(hasEcharts) drawTrendChart(p);
+}
+function trendSummaryHTML(p){
+  const cur=lowestNewNow(p.id); const hist=lowestEver(p.id);
+  const s=dailyLowSeries(p.id,'new');
+  const s30=s.slice(-30); let chg=null;
+  if(s30.length>1 && s30[0].price){ chg=(s30[s30.length-1].price-s30[0].price)/s30[0].price*100; }
+  let targetSub='—';
+  if(p.targetPrice&&cur){
+    const d=(cur.price-p.targetPrice)/p.targetPrice*100;
+    targetSub=(d<=0?'已达目标 🎉':'还差 '+d.toFixed(1)+'%');
+  }
+  return '<div class="sum-grid">'+
+    '<div class="sum-item"><div class="si-lab">当前全网新低</div><div class="si-val num">'+(cur?money(cur.price):'—')+'</div><div class="si-sub">'+(cur?platName(cur.platform)+' · '+shortD(cur.date):'')+'</div></div>'+
+    '<div class="sum-item"><div class="si-lab">历史最低</div><div class="si-val num">'+(hist?money(hist.price):'—')+'</div><div class="si-sub">'+(hist?shortD(hist.date):'')+'</div></div>'+
+    '<div class="sum-item"><div class="si-lab">近30天变化</div><div class="si-val num '+(chg===null?'':chg<=0?'down':'up')+'">'+(chg===null?'—':(chg>0?'+':'')+chg.toFixed(1)+'%')+'</div><div class="si-sub">以每日全网最低价计</div></div>'+
+    '<div class="sum-item"><div class="si-lab">目标价</div><div class="si-val num">'+(p.targetPrice?money(p.targetPrice):'未设置')+'</div><div class="si-sub">'+targetSub+'</div></div>'+
+  '</div>';
+}
+function drawTrendChart(p){
+  const c=mkChart('trend-chart'); if(!c) return;
+  const cap=CUR.trendRange>0?fmtD(new Date(Date.now()-CUR.trendRange*86400000)):null;
+  const dates=[...new Set(DB().prices.filter(r=>r.pid===p.id&&(!cap||r.date>=cap)).map(r=>r.date))].sort();
+  const series=PLATFORMS.filter(pl=>p.platforms.includes(pl.key)).map(pl=>{
+    const map={};
+    const arr=(IDX().get(p.id)||new Map()).get(pl.key)||[];
+    arr.forEach(r=>{ if(cap&&r.date<cap) return; if(map[r.date]===undefined||r.price<map[r.date]) map[r.date]=r.price; });
+    const data=dates.map(d=>map[d]!==undefined?map[d]:null);
+    return {name:pl.name,type:'line',data,showSymbol:false,connectNulls:true,
+      lineStyle:{color:pl.color,width:2,type:pl.type==='used'?'dashed':'solid'},
+      itemStyle:{color:pl.color},emphasis:{focus:'series'}};
+  });
+  const marks=[];
+  if(p.targetPrice) marks.push({yAxis:p.targetPrice,lineStyle:{color:'#dc2626',type:'dashed'},label:{formatter:'目标价 '+money(p.targetPrice),position:'insideEndTop',color:'#dc2626'}});
+  const hist=lowestEver(p.id,cap);
+  if(hist) marks.push({yAxis:hist.price,lineStyle:{color:'#9ca3af',type:'dotted'},label:{formatter:'历史最低 '+money(hist.price),position:'insideEndTop',color:'#6b7280'}});
+  if(marks.length) series.push({name:'参考线',type:'line',data:[],markLine:{silent:true,symbol:'none',data:marks}});
+  c.setOption({
+    tooltip:{trigger:'axis',valueFormatter:v=>v==null?'—':money(v)},
+    legend:{top:0,textStyle:{fontSize:12}},
+    grid:{left:56,right:24,top:36,bottom:40},
+    xAxis:{type:'category',data:dates,axisLabel:{fontSize:11}},
+    yAxis:{type:'value',scale:true,axisLabel:{formatter:v=>'¥'+v,fontSize:11}},
+    dataZoom:[{type:'inside'},{type:'slider',height:18,bottom:8}],
+    series
+  });
+}
+
+/* ---------- 平台对比 ---------- */
+function renderCompare(){
+  const db=DB(); const el=document.getElementById('view-compare');
+  if(!db.products.length){ el.innerHTML=emptyCard('⚖️','还没有商品数据'); return; }
+  if(!CUR.cmpPid || !db.products.find(p=>p.id===CUR.cmpPid)) CUR.cmpPid=db.products[0].id;
+  const t=today();
+  const rows=db.products.map(p=>{
+    const la=latestAll(p.id);
+    const newL=lowestNewNow(p.id); const usedL=lowestUsedNow(p.id);
+    return {p,la,newL,usedL};
+  });
+  el.innerHTML=
+  '<div class="card" style="margin-bottom:14px"><h3>🧮 商品 × 平台 最新价格矩阵<span class="h-extra">绿底 = 同类平台最低价 · 灰色 = 数据过期</span></h3>'+
+  '<div class="tbl-wrap"><table class="tbl"><thead><tr><th style="min-width:180px">商品</th>'+
+  PLATFORMS.map(pl=>'<th><span class="plat-th"><span class="plat-dot" style="background:'+pl.color+'"></span>'+pl.name+(pl.type==='used'?'<small class="muted">(二手)</small>':'')+'</span></th>').join('')+
+  '</tr></thead><tbody>'+
+  rows.map(r=>'<tr><td style="font-weight:600;white-space:normal">'+(r.p.icon||'')+' '+esc(r.p.name)+'</td>'+
+    PLATFORMS.map(pl=>{
+      const rec=r.la[pl.key]; if(!rec) return '<td class="muted">—</td>';
+      const stale=(parseD(t)-parseD(rec.date))/86400000>3;
+      const isLow = pl.type==='new' ? (r.newL&&r.newL.platform===pl.key) : (r.usedL&&r.usedL.platform===pl.key);
+      return '<td class="num'+(isLow?' cell-low':'')+(stale&&!isLow?' cell-stale':'')+'" title="更新于 '+rec.date+(rec.condition?' · '+rec.condition:'')+(rec.promo?' · 促销':'')+(rec.source==='auto'?' · 🤖自动同步':'')+'">'+
+        money(rec.price)+(rec.condition?'<small class="muted"> '+rec.condition+'</small>':'')+(stale?'<small> ⏳</small>':'')+'</td>';
+    }).join('')+'</tr>').join('')+
+  '</tbody></table></div></div>'+
+  '<div class="chips-row">'+db.products.map(x=>'<span class="chip'+(x.id===CUR.cmpPid?' on':'')+'" onclick="App.setCmpProduct(\''+x.id+'\')">'+esc(x.name)+'</span>').join('')+'</div>'+
+  '<div class="grid g2">'+
+    '<div class="card"><h3>📊 '+esc(db.products.find(x=>x.id===CUR.cmpPid).name)+' · 平台价格对比</h3>'+
+    (hasEcharts?'<div id="cmp-chart" class="chart-box-sm"></div>':'<div class="warn-box">未找到 echarts.min.js</div>')+'</div>'+
+    '<div class="card"><h3>♻️ 全新 vs 二手 性价比</h3>'+discountHTML(db.products.find(x=>x.id===CUR.cmpPid))+'</div>'+
+  '</div>';
+  if(hasEcharts) drawCmpChart(db.products.find(x=>x.id===CUR.cmpPid));
+}
+function discountHTML(p){
+  const nl=lowestNewNow(p.id), ul=lowestUsedNow(p.id);
+  if(!nl) return '<div class="muted">暂无全新价格数据</div>';
+  if(!ul) return '<div class="muted">暂无二手价格数据</div>';
+  const ratio=ul.price/nl.price; const save=1-ratio;
+  let verdict,cls;
+  if(save>=0.35){verdict='二手性价比突出，优先考虑二手';cls='badge-good';}
+  else if(save>=0.2){verdict='二手有一定价格优势，可对比成色后决策';cls='badge-warn';}
+  else{verdict='二手优势不大，建议直接买全新';cls='badge-mut';}
+  return '<div style="text-align:center;padding:8px 0 16px">'+
+    '<div style="font-size:34px;font-weight:800;color:'+(save>=0.35?'#16a34a':'#4f46e5')+'" class="num">'+Math.round(save*1000)/10+'%</div>'+
+    '<div class="muted" style="font-size:12.5px">二手最低价相对全新最低价的折扣幅度</div></div>'+
+    '<div class="adv-metrics">'+
+    '<div class="adv-m">全新最低<b class="num">'+money(nl.price)+'<small class="muted" style="font-weight:400"> '+platName(nl.platform)+'</small></b></div>'+
+    '<div class="adv-m">二手最低<b class="num">'+money(ul.price)+'<small class="muted" style="font-weight:400"> '+platName(ul.platform)+(ul.condition?' · '+ul.condition:'')+'</small></b></div>'+
+    '</div>'+
+    '<div style="text-align:center;margin-top:6px"><span class="badge '+cls+'">'+verdict+'</span></div>';
+}
+function drawCmpChart(p){
+  const c=mkChart('cmp-chart'); if(!c) return;
+  const la=latestAll(p.id);
+  const data=PLATFORMS.filter(pl=>la[pl.key]).map(pl=>({
+    value:la[pl.key].price,
+    itemStyle:{color:pl.color},
+    name:pl.name+(pl.type==='used'?' ·'+(la[pl.key].condition||'二手'):'')
+  })).sort((a,b)=>a.value-b.value);
+  c.setOption({
+    tooltip:{trigger:'axis',axisPointer:{type:'shadow'},valueFormatter:v=>money(v)},
+    grid:{left:80,right:56,top:8,bottom:24},
+    xAxis:{type:'value',axisLabel:{formatter:v=>'¥'+v,fontSize:11},scale:true},
+    yAxis:{type:'category',data:data.map(d=>d.name),axisLabel:{fontSize:12}},
+    series:[{type:'bar',data,barMaxWidth:18,label:{show:true,position:'right',formatter:p=>money(p.value),fontSize:11}}],
+  });
+}
+
+/* ---------- 购买建议 ---------- */
+function renderAdvice(){
+  const db=DB(); const el=document.getElementById('view-advice');
+  if(!db.products.length){ el.innerHTML=emptyCard('💡','还没有商品数据'); return; }
+  const t=today();
+  const items=db.products.map(p=>{
+    const cur=lowestNewNow(p.id); const hist=lowestEver(p.id); const used=lowestUsedNow(p.id);
+    const pct=cur?percentileOf(p.id,cur.price):50;
+    const ratio=(cur&&used)?used.price/cur.price:null;
+    let score=0;
+    score+=45*(1-pct/100);
+    if(p.targetPrice&&cur) score+=cur.price<=p.targetPrice?30:30*Math.max(0,1-(cur.price-p.targetPrice)/p.targetPrice*4);
+    if(ratio!==null) score+=20*Math.min(1,(1-ratio)/0.45);
+    const lu=productLastDate(p.id);
+    const freshDays=lu?(parseD(t)-parseD(lu))/86400000:99;
+    score=Math.round(clamp(score,0,100));
+    let badge,bcls,reasons=[];
+    if(p.targetPrice&&cur&&cur.price<=p.targetPrice){badge='🔥 立即买入';bcls='badge-good';}
+    else if(pct<=10){badge='🔥 历史新低区域';bcls='badge-good';}
+    else if(score>=60){badge='✅ 可以入手';bcls='badge-good';}
+    else if(pct>=65){badge='⏳ 建议观望';bcls='badge-bad';}
+    else{badge='👀 持续关注';bcls='badge-warn';}
+    if(cur){
+      reasons.push('当前全新最低 '+money(cur.price)+'（'+platName(cur.platform)+'）'+(hist?'，历史最低 '+money(hist.price)+'（'+shortD(hist.date)+'）':''));
+      reasons.push('价格处于历史 '+pct+' 百分位'+(pct<=15?' —— 已在历史低位区间':pct>=65?' —— 当前偏高，建议等促销':''));
+    }
+    if(p.targetPrice&&cur){
+      if(cur.price<=p.targetPrice) reasons.push('已达到你的目标价 '+money(p.targetPrice)+' 🎉');
+      else reasons.push('距目标价还差 '+money(cur.price-p.targetPrice)+'（'+((cur.price-p.targetPrice)/p.targetPrice*100).toFixed(1)+'%）');
+    }
+    if(ratio!==null){
+      reasons.push('二手最低 '+money(used.price)+(used.condition?'（'+used.condition+'）':'')+'，约为新品的 '+Math.round(ratio*100)+'%'+
+        (ratio<=0.65?' —— 二手性价比突出，值得对比成色':''));
+    }
+    if(freshDays>3) reasons.push('⚠️ 数据 '+Math.round(freshDays)+' 天未更新，建议先录入最新价格');
+    return {p,cur,pct,ratio,score,badge,bcls,reasons};
+  }).sort((a,b)=>b.score-a.score);
+  const ringColor=s=>s>=75?'#16a34a':s>=55?'#d97706':'#dc2626';
+  el.innerHTML=
+  '<div class="kbd-note" style="margin-bottom:14px">💡 综合评分 = 价格历史百分位（45分）+ 目标价达成（30分）+ 二手折扣空间（20分）。'+
+  '分数越高越接近「值得出手」；数据越新评分越可靠。</div>'+
+  '<div class="grid g2">'+items.map(a=>
+    '<div class="card adv-card">'+
+      '<div class="ring" style="background:conic-gradient('+ringColor(a.score)+' '+(a.score*3.6)+'deg,#e5e7eb 0)">'+
+        '<div class="ring-in" style="color:'+ringColor(a.score)+'">'+a.score+'<span class="r-cap">综合分</span></div></div>'+
+      '<div class="adv-body">'+
+        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-size:14.5px">'+(a.p.icon||'')+' '+esc(a.p.name)+'</b>'+
+        '<span class="badge '+a.bcls+'">'+a.badge+'</span></div>'+
+        '<div class="adv-metrics">'+
+          '<div class="adv-m">历史百分位<b class="num">'+a.pct+'%</b></div>'+
+          '<div class="adv-m">当前新低<b class="num">'+(a.cur?money(a.cur.price):'—')+'</b></div>'+
+          (a.p.targetPrice?'<div class="adv-m">目标价<b class="num">'+money(a.p.targetPrice)+'</b></div>':'')+
+          (a.ratio!==null?'<div class="adv-m">二手/新品<b class="num">'+Math.round(a.ratio*100)+'%</b></div>':'')+
+        '</div>'+
+        '<ul class="adv-reasons">'+a.reasons.map(r=>'<li>'+esc(r)+'</li>').join('')+'</ul>'+
+        '<div style="margin-top:10px;display:flex;gap:8px">'+
+        '<button class="btn btn-sm" onclick="App.go(\'trends\');App.setTrendProduct(\''+a.p.id+'\')">看走势</button>'+
+        (a.cur?'<button class="btn btn-sm btn-primary" onclick="App.openLink(\''+a.cur.platform+'\',\''+a.p.id+'\')">去 '+platName(a.cur.platform)+'看看 →</button>':'')+
+        '</div>'+
+      '</div>'+
+    '</div>').join('')+'</div>';
+}
+
+/* ---------- 数据管理 ---------- */
+function renderData(){
+  const db=DB(); const el=document.getElementById('view-data');
+  const bytes=new Blob([JSON.stringify(db)]).size;
+  const kb=(bytes/1024).toFixed(1);
+  el.innerHTML=
+  '<div class="card" style="margin-bottom:14px"><h3>☁️ 自动同步（云端数据源）</h3>'+
+  '<div class="muted" style="font-size:12.5px;margin-bottom:10px;line-height:1.7">'+
+  '从 GitHub 数据仓库拉取定时抓取的价格快照（Apple 官网/京东等，由 GitHub Actions 每天自动更新）：'+
+  '按<b style="color:var(--ink)">商品名精确匹配</b> → 同平台同日期覆盖 → 记录标记「🤖自动」。'+
+  '淘宝/拼多多/抖音/闲鱼反爬严格仍需手动录入。raw 地址拉取失败会自动切换 jsDelivr 镜像。</div>'+
+  '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+  '<input class="input" id="sync-url" style="flex:1;min-width:260px" placeholder="数据源 URL，如 https://raw.githubusercontent.com/用户名/仓库/main/data/prices.json" value="'+esc(localStorage.getItem('pm-sync-url')||'')+'">'+
+  '<button class="btn btn-primary" id="sync-btn" onclick="App.runSync()">⬇️ 立即同步</button></div>'+
+  '<div id="sync-result" class="kbd-note" style="margin-top:10px;display:none"></div></div>'+
+  '<div class="grid g2">'+
+    '<div class="card"><h3>💾 数据备份</h3>'+
+      '<div class="muted" style="font-size:12.5px;margin-bottom:12px;line-height:1.7">所有数据保存在浏览器 localStorage 中（当前占用约 '+kb+' KB）。'+
+      '建议定期导出 JSON 备份；更换电脑或浏览器时用导入恢复。</div>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+      '<button class="btn btn-primary" onclick="App.exportData()">⬇️ 导出 JSON 备份</button>'+
+      '<button class="btn" onclick="App.pickImport()">⬆️ 导入 JSON</button>'+
+      '<input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="App.onImportFile(this)">'+
+      '</div>'+
+      '<div class="sum-grid" style="margin-top:14px;grid-template-columns:1fr 1fr 1fr">'+
+      '<div class="sum-item"><div class="si-lab">商品</div><div class="si-val num">'+db.products.length+'</div></div>'+
+      '<div class="sum-item"><div class="si-lab">价格记录</div><div class="si-val num">'+db.prices.length+'</div></div>'+
+      '<div class="sum-item"><div class="si-lab">最早数据</div><div class="si-val num" style="font-size:14px">'+(db.prices.length?shortD(db.prices.reduce((a,r)=>r.date<a.date?r:a).date):'—')+'</div></div>'+
+      '</div></div>'+
+    '<div class="card"><h3>🎲 演示数据</h3>'+
+      '<div class="muted" style="font-size:12.5px;margin-bottom:12px;line-height:1.7">内置 8 件商品、一整年的模拟价格行情（含 618 / 双11 大促曲线），用于体验看板全部功能。</div>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+      '<button class="btn btn-primary" onclick="App.genDemo()">生成/重新生成演示数据</button>'+
+      '<button class="btn btn-danger" onclick="App.wipeData()">🗑️ 清空全部数据</button></div>'+
+      '<div class="warn-box" style="margin-top:12px">⚠️ 「清空全部数据」会删除所有商品与价格记录且不可恢复，请先导出备份。</div></div>'+
+  '</div>'+
+  '<div class="card" style="margin-top:14px"><h3>☁️ 后续云端部署说明</h3>'+
+  '<div class="muted" style="font-size:13px;line-height:1.9">'+
+  '本工作台当前为<b style="color:var(--ink)">本地单机版</b>，数据层已收口在 <code>Store</code> 模块（index.html 内）。'+
+  '后续迁移到腾讯云 CloudBase 时：① 点击「导出 JSON 备份」拿到全量数据；② 在云端新建环境后，将 Store 的读写方法替换为云数据库 API（或由定时云函数写入价格快照）；③ 通过「导入 JSON」或脚本灌入历史数据即可无缝衔接。'+
+  '</div></div>';
+}
+function emptyCard(ico,txt){
+  return '<div class="card"><div class="empty"><div class="e-ico">'+ico+'</div><div class="e-t">'+txt+'</div>'+
+  '<button class="btn btn-primary" style="margin-top:14px" onclick="App.go(\'products\')">去添加商品</button></div></div>';
+}
+
+/* ---------- 商品表单 ---------- */
+function productFormHTML(p){
+  p=p||{};
+  const checks=PLATFORMS.map(pl=>{
+    const on=p.platforms?p.platforms.includes(pl.key):(pl.key==='taobao'||pl.key==='jd'||pl.key==='xianyu'||pl.key==='aihuishou');
+    return '<label class="pc'+(on?' checked':'')+'" onchange="App.togglePlatCheck(this)"><input type="checkbox" class="chk-plat" value="'+pl.key+'"'+(on?' checked':'')+' data-color="'+pl.color+'" data-name="'+pl.name+'">'+
+    '<span class="plat-dot" style="background:'+pl.color+'"></span>'+pl.name+'</label>';
+  }).join('');
+  const links=PLATFORMS.map(pl=>
+    '<div class="lk"><span><span class="plat-dot" style="background:'+pl.color+'"></span>'+pl.name+'链接</span>'+
+    '<input class="input" id="pf_link_'+pl.key+'" placeholder="粘贴'+pl.name+'商品页链接（可留空）" value="'+esc(p.links&&p.links[pl.key]||'')+'"></div>').join('');
+  return '<h3>'+(p.id?'✏️ 编辑商品':'＋ 添加商品')+'</h3>'+
+  '<div class="form-row"><label class="fl">商品名称 *</label><input class="input" id="pf_name" placeholder="如：iPhone 15 Pro 256G" value="'+esc(p.name||'')+'"></div>'+
+  '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">'+
+    '<div class="form-row"><label class="fl">分类</label><select class="select" id="pf_cat">'+
+      CATEGORIES.map(c=>'<option'+(p.category===c?' selected':'')+'>'+c+'</option>').join('')+'</select></div>'+
+    '<div class="form-row"><label class="fl">图标（emoji）</label><input class="input" id="pf_icon" placeholder="📱" value="'+esc(p.icon||'')+'" maxlength="4"></div>'+
+    '<div class="form-row"><label class="fl">目标价（元）</label><input class="input" id="pf_target" type="number" min="0" step="0.01" placeholder="低于此价提醒买入" value="'+(p.targetPrice||'')+'"></div>'+
+  '</div>'+
+  '<div class="form-row"><label class="fl">图片链接（可选，优先于 emoji 显示）</label><input class="input" id="pf_img" placeholder="https://..." value="'+esc(p.img||'')+'"></div>'+
+  '<div class="form-row"><label class="fl">跟踪平台（勾选后才会出现在录价 / 对比 / 走势中）</label><div class="plat-checks">'+checks+'</div></div>'+
+  '<div class="form-row"><label class="fl">⚡ 快捷：粘贴任意商品链接，自动识别平台并填入</label>'+
+    '<input class="input" id="pf_paste" placeholder="粘贴淘宝/京东/拼多多/抖音/闲鱼/转转/爱回收/拍拍 链接…" oninput="App.detectLink(this)"></div>'+
+  '<div class="form-row"><label class="fl">各平台商品链接（可选）</label><div class="links-grid">'+links+'</div></div>'+
+  '<div class="form-row"><label class="fl">备注</label><textarea class="input" id="pf_note" rows="2" placeholder="型号配置、店铺、成色要求等">'+esc(p.note||'')+'</textarea></div>'+
+  '<div class="m-foot"><button class="btn" onclick="App.closeModal()">取消</button>'+
+  '<button class="btn btn-primary" onclick="App.saveProductForm(\''+(p.id||'')+'\')">💾 保存商品</button></div>';
+}
+
+/* ==================================================================
+   App 全局动作
+================================================================== */
+const App={
+  go(v){ switchView(v); },
+  closeModal(){ closeModal(); },
+  confirmOk(){ const f=_confirmFn; _confirmFn=null; closeModal(); if(f) f(); },
+
+  /* 商品 */
+  openProductForm(id){
+    const p=id?DB().products.find(x=>x.id===id):null;
+    openModal(productFormHTML(p||null));
+  },
+  togglePlatCheck(lab){
+    lab.classList.toggle('checked', lab.querySelector('input').checked);
+  },
+  detectLink(el){
+    const k=detectPlatform(el.value);
+    if(!k) return;
+    const inp=document.getElementById('pf_link_'+k);
+    if(inp && !inp.value){ inp.value=el.value.trim(); el.value=''; toast('已识别为「'+platName(k)+'」链接并填入 ✅'); }
+    else if(inp){ inp.value=el.value.trim(); el.value=''; toast('已填入「'+platName(k)+'」链接 ✅'); }
+  },
+  saveProductForm(id){
+    const name=document.getElementById('pf_name').value.trim();
+    if(!name){ toast('请填写商品名称','warn'); return; }
+    const db=DB();
+    let p=id?db.products.find(x=>x.id===id):null;
+    if(!p){ p={id:genId('p'),createdAt:today()}; db.products.push(p); }
+    p.name=name;
+    p.category=document.getElementById('pf_cat').value;
+    p.icon=document.getElementById('pf_icon').value.trim();
+    p.img=document.getElementById('pf_img').value.trim();
+    const tgt=+document.getElementById('pf_target').value;
+    p.targetPrice=tgt>0?Math.round(tgt*100)/100:null;
+    p.note=document.getElementById('pf_note').value.trim();
+    p.platforms=[...document.querySelectorAll('.chk-plat:checked')].map(i=>i.value);
+    p.links={};
+    PLATFORMS.forEach(pl=>{ const v=document.getElementById('pf_link_'+pl.key).value.trim(); if(v) p.links[pl.key]=v; });
+    if(!p.platforms.length){ toast('至少勾选一个跟踪平台','warn'); return; }
+    Store.save(); closeModal(); toast('商品已保存 ✅'); switchView('products');
+  },
+  deleteProduct(id){
+    const p=DB().products.find(x=>x.id===id); if(!p) return;
+    confirmBox('删除商品','确定删除「'+esc(p.name)+'」？其全部价格记录（'+DB().prices.filter(r=>r.pid===id).length+'条）将一并删除，不可恢复。','删除',()=>{
+      const db=DB();
+      db.products=db.products.filter(x=>x.id!==id);
+      db.prices=db.prices.filter(r=>r.pid!==id);
+      Store.save(); toast('已删除'); switchView('products');
+    },true);
+  },
+  openLink(plat,pid){
+    const p=DB().products.find(x=>x.id===pid); if(!p) return;
+    openPlatURL(plat,p.name,p.links&&p.links[plat]);
+  },
+
+  /* 录价 */
+  onEntryDate(){
+    const v=(document.getElementById('entry-date')||{}).value;
+    CUR.entryDate=v||today();
+  },
+  copyLastRow(pid){
+    const p=DB().products.find(x=>x.id===pid); if(!p) return;
+    const cap=(document.getElementById('entry-date')||{}).value||today();
+    let n=0;
+    for(const k of p.platforms){
+      const r=latest(pid,k,cap); if(!r) continue;
+      const inp=document.getElementById('ep_'+pid+'_'+k);
+      if(inp){ inp.value=r.price; n++; }
+      const cond=document.getElementById('ec_'+pid+'_'+k);
+      if(cond && r.condition) cond.value=r.condition;
+    }
+    toast(n?('已填入 '+n+' 个平台的上次价格'):'该商品暂无历史价格');
+  },
+  saveEntryRow(pid){ saveEntries([pid]); },
+  saveEntryAll(){ saveEntries(DB().products.map(p=>p.id)); },
+
+  /* 趋势/对比 */
+  setTrendProduct(pid){ CUR.trendPid=pid; if(CUR.view==='trends') switchView('trends'); },
+  setTrendRange(r){ CUR.trendRange=r; if(CUR.view==='trends') switchView('trends'); },
+  setCmpProduct(pid){ CUR.cmpPid=pid; if(CUR.view==='compare') switchView('compare'); },
+
+  /* 数据 */
+  async runSync(){
+    const urlInput=document.getElementById('sync-url');
+    const url=(urlInput&&urlInput.value.trim())||localStorage.getItem('pm-sync-url')||'';
+    if(!url){ toast('请先填写数据源 URL','warn'); return; }
+    localStorage.setItem('pm-sync-url',url);
+    const btn=document.getElementById('sync-btn');
+    if(btn){ btn.disabled=true; btn.textContent='⏳ 同步中…'; }
+    try{
+      // raw.githubusercontent.com 拉取失败自动切换 jsDelivr 镜像（两者均允许跨域）
+      const tryUrls=[url];
+      const m=url.match(/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)/);
+      if(m) tryUrls.push('https://cdn.jsdelivr.net/gh/'+m[1]+'/'+m[2]+'@'+m[3]+'/'+m[4]);
+      let obj=null,lastErr=null,usedUrl='';
+      for(const u of tryUrls){
+        try{
+          const res=await fetch(u,{cache:'no-store'});
+          if(!res.ok) throw new Error('HTTP '+res.status);
+          obj=await res.json(); usedUrl=u; break;
+        }catch(e){ lastErr=e; }
+      }
+      if(!obj || (!Array.isArray(obj.series) && !Array.isArray(obj))){
+        const box=document.getElementById('sync-result');
+        if(box){ box.style.display='block'; box.textContent='❌ 同步失败：'+(lastErr?lastErr.message:'数据格式不符'); }
+        toast('同步失败','bad'); return;
+      }
+      const series=Array.isArray(obj.series)?obj.series:obj;
+      const db=DB();
+      const byName={}; db.products.forEach(p=>byName[p.name]=p);
+      let added=0,updated=0,noMatch=[];
+      for(const e of series){
+        if(!e || !e.match || !e.platform || !e.date || !(+e.price>0)) continue;
+        const p=byName[e.match];
+        if(!p){ if(noMatch.indexOf(e.match)<0) noMatch.push(e.match); continue; }
+        if(!p.platforms.includes(e.platform)) p.platforms.push(e.platform);
+        const rec={id:genId(),pid:p.id,platform:e.platform,date:e.date,
+          price:Math.round(+e.price),source:e.source||'auto'};
+        if(e.title) rec.title=e.title;
+        const i=db.prices.findIndex(r=>r.pid===p.id&&r.platform===e.platform&&r.date===e.date);
+        if(i>=0){ db.prices[i]=rec; updated++; } else { db.prices.push(rec); added++; }
+      }
+      Store.save();
+      switchView(CUR.view); // 刷新当前页数据
+      const box=document.getElementById('sync-result');
+      const msg='✅ 同步完成：新增 '+added+' 条，覆盖 '+updated+' 条'+
+        (noMatch.length?('；'+noMatch.length+' 个数据源条目未匹配到本地商品（'+esc(noMatch[0])+' 等）'):'')+
+        '<br>数据源更新时间：'+esc(obj.updated||'未知')+' · 实际使用源：'+esc(usedUrl)+
+        '<br>已同步记录可在「平台对比」页鼠标悬停查看「🤖自动」标记';
+      if(box){ box.style.display='block'; box.innerHTML=msg; }
+      toast('同步完成：新增 '+added+' 条，覆盖 '+updated+' 条 ✅');
+    }finally{
+      if(btn){ btn.disabled=false; btn.textContent='⬇️ 立即同步'; }
+    }
+  },
+  exportData(){
+    const blob=new Blob([JSON.stringify(DB(),null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='价格监控数据-'+today().replace(/-/g,'')+'.json';
+    a.click(); URL.revokeObjectURL(a.href);
+    toast('已导出 JSON 备份 ✅');
+  },
+  pickImport(){ document.getElementById('import-file').click(); },
+  onImportFile(input){
+    const f=input.files&&input.files[0]; if(!f) return;
+    const rd=new FileReader();
+    rd.onload=()=>{
+      try{
+        const d=JSON.parse(rd.result);
+        if(!d || !Array.isArray(d.products) || !Array.isArray(d.prices)) throw new Error('格式不符');
+        confirmBox('导入数据','即将导入 <b>'+d.products.length+'</b> 件商品、<b>'+d.prices.length+'</b> 条价格记录，'+
+          '并<b style="color:#dc2626">覆盖当前全部数据</b>（'+DB().products.length+' 件商品）。建议先导出备份。','覆盖导入',()=>{
+          Store.replace(d); toast('导入成功 ✅'); switchView('dashboard');
+        },true);
+      }catch(e){ toast('导入失败：'+e.message,'bad'); }
+      input.value='';
+    };
+    rd.readAsText(f,'utf-8');
+  },
+  genDemo(){
+    confirmBox('生成演示数据','将生成 8 件商品 + 一年模拟行情，<b>覆盖当前数据</b>（'+DB().products.length+' 件商品）。继续吗？','生成',()=>{
+      Store.replace(genDemoData());
+      toast('演示数据已生成 ✅'); switchView('dashboard');
+    });
+  },
+  wipeData(){
+    confirmBox('清空全部数据','⚠️ 将删除全部商品与价格记录，且<b style="color:#dc2626">不可恢复</b>。确定继续？','确认清空',()=>{
+      Store.replace({products:[],prices:[],meta:{welcomed:true}});
+      toast('已清空全部数据'); switchView('dashboard');
+    },true);
+  },
+  welcome(choice){
+    closeModal();
+    if(choice==='demo'){ Store.replace(genDemoData()); toast('演示数据已生成，开始体验吧 🎉'); switchView('dashboard'); }
+    else{ DB().meta.welcomed=true; Store.save(); switchView('dashboard'); }
+  },
+};
+window.App=App;
+
+/* ---------- 启动 ---------- */
+Store.load();
+switchView('dashboard');
+if(!DB().products.length && !DB().meta.welcomed){
+  setTimeout(()=>{
+    openModal(
+      '<div style="text-align:center;padding:8px 0 4px"><div style="font-size:46px">📈</div>'+
+      '<h3 style="margin-top:10px">欢迎使用商品价格监控工作台</h3>'+
+      '<div class="muted" style="font-size:13px;line-height:1.8;margin-top:6px">'+
+      '帮你跟踪各电商平台与二手平台的商品价格：每日记录、趋势分析、多平台对比、购买时机建议。<br>'+
+      '第一次使用，建议先体验内置的演示数据（8件商品 · 一年模拟行情）。</div>'+
+      '<div class="welcome-btns">'+
+      '<button class="btn" onclick="App.welcome(\'blank\')">从空白开始</button>'+
+      '<button class="btn btn-primary" onclick="App.welcome(\'demo\')">🎲 生成演示数据</button>'+
+      '</div></div>', true);
+  },300);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# ZCode 工作区内部文件
+.zcode/
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
+# 慢慢买 token（个人凭据，绝不入库）
+sync/manmanbuy_token.txt

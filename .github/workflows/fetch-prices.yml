@@ -1,0 +1,53 @@
+name: fetch-prices
+
+on:
+  schedule:
+    # UTC 时间；北京 = UTC+8（无夏令时）
+    - cron: '0 1 * * *'    # 北京时间 每天 09:00
+    - cron: '0 13 * * *'   # 北京时间 每天 21:00
+  workflow_dispatch:
+    inputs:
+      backfill:
+        description: '额外运行慢慢买历史回填（实验性，需已配置 token）'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch-prices
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 抓取价格快照
+        shell: bash
+        env:
+          TZ: Asia/Shanghai
+        run: |
+          ARGS=""
+          if [ "${{ inputs.backfill }}" = "true" ]; then ARGS="--backfill"; fi
+          python sync/fetch_prices.py $ARGS
+
+      - name: 提交数据变更
+        shell: bash
+        run: |
+          git config user.name "price-bot"
+          git config user.email "action@github.com"
+          git add data/prices.json
+          if git diff --cached --quiet; then
+            echo "本次无价格变更，跳过提交"
+          else
+            git commit -m "price snapshot $(TZ=Asia/Shanghai date '+%F %H:%M')"
+            git push
+          fi

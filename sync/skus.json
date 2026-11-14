@@ -1,0 +1,20 @@
+{
+  "_说明": [
+    "本文件是抓取器的商品映射配置：name 必须与工作台中的商品名完全一致（同步按名称匹配）。",
+    "jd_sku: 京东商品数字 ID（从 item.jd.com/数字.html 的 URL 中取）。填 null 表示跳过京东源。",
+    "  注意：必须填与「尺寸+芯片+内存硬盘配置」完全一致的京东商品页 ID，配置不同价格会污染数据。",
+    "慢慢买实验源: 若需回填历史价，从慢慢买 App/网页抓包获取 token，存入 sync/manmanbuy_token.txt（获取方式见 README）。"
+  ],
+  "products": [
+    { "name": "MacBook Pro 14英寸 M1 Pro (16G+512G)", "size": 14, "chip": "M1 Pro", "jd_sku": null },
+    { "name": "MacBook Pro 16英寸 M1 Pro (16G+512G)", "size": 16, "chip": "M1 Pro", "jd_sku": null },
+    { "name": "MacBook Pro 14英寸 M2 Pro (16G+512G)", "size": 14, "chip": "M2 Pro", "jd_sku": null },
+    { "name": "MacBook Pro 16英寸 M2 Pro (16G+512G)", "size": 16, "chip": "M2 Pro", "jd_sku": null },
+    { "name": "MacBook Pro 14英寸 M3 Pro (18G+512G)", "size": 14, "chip": "M3 Pro", "jd_sku": null },
+    { "name": "MacBook Pro 16英寸 M3 Pro (18G+512G)", "size": 16, "chip": "M3 Pro", "jd_sku": null },
+    { "name": "MacBook Pro 14英寸 M4 Pro (24G+512G)", "size": 14, "chip": "M4 Pro", "cpu_cores": 12, "jd_sku": null },
+    { "name": "MacBook Pro 16英寸 M4 Pro (24G+512G)", "size": 16, "chip": "M4 Pro", "cpu_cores": 14, "jd_sku": null },
+    { "name": "MacBook Pro 14英寸 M5 Pro (24G+1TB)", "size": 14, "chip": "M5 Pro", "cpu_cores": 15, "jd_sku": null },
+    { "name": "MacBook Pro 16英寸 M5 Pro (24G+1TB)", "size": 16, "chip": "M5 Pro", "cpu_cores": 18, "jd_sku": null }
+  ]
+}
