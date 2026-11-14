@@ -11,3 +11,9 @@ Thumbs.db
 
 # 慢慢买 token（个人凭据，绝不入库）
 sync/manmanbuy_token.txt
+
+# 闲鱼登录态（个人凭据，绝不入库）
+sync/xianyu_state.json
+
+# 调试脚本产物
+sync/explore_zhuanzhuan.py

@@ -88,8 +88,25 @@ python sync/fetch_prices.py --backfill # 额外尝试慢慢买历史回填（实
 |---|---|---|
 | Apple 官网（全新/官翻） | ✅ 稳定 | 服务端渲染，每日快照 |
 | 京东 p.3.cn | ⚠️ 可用 | 非官方接口，随时可能失效；失败安全跳过 |
+| 闲鱼（goofish.com） | ✅ 可行 | 需一次性扫码登录（见下文），JS 渲染解析，改版可能失效 |
 | 慢慢买历史价 | 🧪 实验 | 需自供 token，仅手动回填 |
-| 淘宝/拼多多/抖音/闲鱼/转转/爱回收/拍拍 | ❌ 手动 | 反爬严格，每日 1 分钟手动录入 |
+| 转转 | ❌ 已放弃 | Web 端搜索已下线（m 站废弃、PC 仅营销页），C 端全在 App/小程序 |
+| 淘宝/拼多多/抖音 | ❌ 手动 | 反爬极强（签名+风控），个人不建议碰 |
+
+### 闲鱼二手价自动抓取（Playwright）
+
+闲鱼 Web 端（goofish.com）可登录后浏览搜索结果，基于 Playwright 实现低频抓取：
+
+```bash
+pip install playwright && python -m playwright install chromium   # 首次安装（约 150MB）
+python sync/scrape_xianyu.py --login    # 弹出浏览器窗口，扫码登录闲鱼（登录态存本地，不入库）
+python sync/scrape_xianyu.py            # 无头抓取：按 skus.json 的 xianyu_keyword 逐个搜索并写入 data/prices.json
+```
+
+- 抓取完成后打开工作台「数据管理 → ☁️ 立即同步」即可入库（或随 `data/prices.json` 一起推送到 GitHub 供其他设备同步）
+- 过滤规则：`xianyu_tokens`（必须命中，如芯片型号）+ `xianyu_any_tokens`（任一命中，如 14寸/14英寸变体）+ `xianyu_price_floor`（价格下限，挡配件/坏价）
+- 请保持低频：脚本内置 4~8 秒随机间隔；**请勿高频运行**，账号存在被风控限制的可能，建议使用小号
+- 登录态失效时会明确提示重新 `--login`；GitHub Actions 不跑闲鱼源（无登录态）
 
 ## ☁️ 后续迁移云端（规划）
 
