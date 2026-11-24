@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-24T08:33:43+08:00",
+  "updated": "2026-11-24T18:40:11+08:00",
   "series": [
     {
       "match": "MacBook Pro 14英寸 M5 Pro (24G+1TB)",
@@ -373,7 +373,7 @@
       "match": "MacBook Pro 16英寸 M4 Pro (24G+512G)",
       "platform": "apple_refurb",
       "date": "2026-11-24",
-      "price": 18399,
+      "price": 22299,
       "title": "翻新 16 英寸 MacBook Pro Apple M4 Pro 芯片 (配备 14 核中央处理器和 20 核图形处理器) - 银色",
       "source": "apple"
     },
@@ -381,7 +381,7 @@
       "match": "MacBook Pro 16英寸 M5 Pro (24G+1TB)",
       "platform": "apple_refurb",
       "date": "2026-11-24",
-      "price": 21199,
+      "price": 24399,
       "title": "翻新 16 英寸 MacBook Pro Apple M5 Pro 芯片 (配备 18 核中央处理器和 20 核图形处理器) - 银色",
       "source": "apple"
     },
